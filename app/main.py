@@ -7,6 +7,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import re
 import time
 from pathlib import Path
 from typing import Any
@@ -69,8 +70,93 @@ def _load_kinds() -> list[dict[str, Any]]:
     return kinds
 
 
-KINDS = _load_kinds()
-KIND_BY_ID = {k["id"]: k for k in KINDS}
+DATA_DIR = Path(os.getenv("DATA_DIR", str(Path(__file__).resolve().parent.parent / "data")))
+LOOKUPS_FILE = DATA_DIR / "lookups.json"
+ADMIN_USERS = {u.strip().lower() for u in os.getenv("ADMIN_USERS", "").split(",") if u.strip()}
+
+LOOKUP_KEYS = ("id", "label", "root", "match", "field", "subfolders")
+
+
+def _normalize_kind(k: dict[str, Any]) -> dict[str, Any] | None:
+    kid = re.sub(r"[^a-z0-9]", "", str(k.get("id") or k.get("label") or "").lower())
+    label = str(k.get("label") or "").strip()
+    root = "\\" + str(k.get("root") or "").strip().strip("\\")
+    match = str(k.get("match") or "prefix").strip().lower()
+    field = str(k.get("field") or "").strip()
+    if match not in ("prefix", "contains", "field"):
+        match = "prefix"
+    if match == "field" and not field:
+        match = "prefix"
+    if not kid or not label or root == "\\":
+        return None
+    return {"id": kid, "label": label, "root": root, "match": match, "field": field if match == "field" else "", "subfolders": bool(k.get("subfolders"))}
+
+
+def _load_saved_kinds() -> list[dict[str, Any]] | None:
+    try:
+        if not LOOKUPS_FILE.exists():
+            return None
+        raw = json.loads(LOOKUPS_FILE.read_text("utf-8"))
+        out, seen = [], set()
+        for k in raw if isinstance(raw, list) else []:
+            n = _normalize_kind(k) if isinstance(k, dict) else None
+            if n and n["id"] not in seen:
+                seen.add(n["id"]); out.append(n)
+        return out or None
+    except Exception:
+        return None
+
+
+def _save_kinds(kinds: list[dict[str, Any]]) -> None:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    tmp = LOOKUPS_FILE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(kinds, indent=2), "utf-8")
+    tmp.replace(LOOKUPS_FILE)
+
+
+KINDS: list[dict[str, Any]] = _load_saved_kinds() or _load_kinds()   # shared defaults
+
+
+def _set_kinds(kinds: list[dict[str, Any]]) -> None:
+    global KINDS
+    KINDS = kinds
+
+
+def _user_file(user: str) -> Path:
+    safe = re.sub(r"[^a-z0-9]+", "_", (user or "").lower()).strip("_") or "user"
+    return DATA_DIR / "users" / f"{safe}.json"
+
+
+def _load_user_kinds(user: str) -> list[dict[str, Any]] | None:
+    """The user's own list, or None if they use the shared defaults."""
+    try:
+        f = _user_file(user)
+        if not f.exists():
+            return None
+        raw = json.loads(f.read_text("utf-8"))
+        out, seen = [], set()
+        for k in raw if isinstance(raw, list) else []:
+            n = _normalize_kind(k) if isinstance(k, dict) else None
+            if n and n["id"] not in seen:
+                seen.add(n["id"]); out.append(n)
+        return out or None
+    except Exception:
+        return None
+
+
+def _effective_kinds(session: dict[str, Any] | None) -> list[dict[str, Any]]:
+    if session and session.get("user"):
+        mine = _load_user_kinds(session["user"])
+        if mine:
+            return mine
+    return KINDS
+
+
+def _write_json(path: Path, data: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(data, indent=2), "utf-8")
+    tmp.replace(path)
 
 
 def _fernet() -> Fernet:
@@ -185,10 +271,27 @@ async def api_config(request: Request) -> dict[str, Any]:
         "title": APP_TITLE,
         "repository": LF.repository,
         "webUrl": LF_WEB_URL,
-        "kinds": KINDS,
+        "kinds": _effective_kinds(s),
         "signedIn": bool(s),
         "username": (s or {}).get("user") or _suggested_username(request),
+        "isAdmin": _is_admin(request, s),
+        "hasCustom": bool(s and s.get("user") and _load_user_kinds(s["user"])),
     }
+
+
+def _is_admin(request: Request, session: dict[str, Any] | None) -> bool:
+    if not ADMIN_USERS:
+        return False
+    names = set()
+    if session and session.get("user"):
+        names.add(session["user"].lower())
+    for h in ("x-auth-request-email", "x-auth-request-user"):
+        v = request.headers.get(h)
+        if v:
+            names.add(v.lower()); names.add(v.split("@")[0].lower())
+    # allow matching without the DOMAIN\ prefix too
+    names |= {n.split("\\")[-1] for n in list(names)}
+    return bool(names & ADMIN_USERS)
 
 
 @app.post("/api/login")
@@ -219,7 +322,7 @@ async def api_logout():
 
 @app.get("/api/lookup/{kind}")
 async def api_lookup(kind: str, q: str, session: dict = Depends(require_session)):
-    k = KIND_BY_ID.get(kind)
+    k = next((x for x in _effective_kinds(session) if x["id"] == kind), None)
     if not k:
         raise HTTPException(404, "Unknown lookup")
     q = q.strip()
@@ -304,6 +407,81 @@ async def api_lfe(entry_id: int, name: str = "", pages: int = 0, folder: bool = 
         media_type="application/octet-stream",
         headers={"Content-Disposition": f'attachment; filename="{safe}.lfe"', "Cache-Control": "no-store"},
     )
+
+
+# ---------------------------------------------------------------- settings (document types)
+
+@app.get("/api/lookups")
+async def api_lookups_get(request: Request, session: dict = Depends(require_session)):
+    mine = _load_user_kinds(session["user"])
+    return {
+        "mine": mine or KINDS,
+        "hasCustom": bool(mine),
+        "shared": KINDS,
+        "isAdmin": _is_admin(request, session),
+    }
+
+
+class LookupsBody(BaseModel):
+    lookups: list[dict[str, Any]]
+    scope: str = "mine"   # "mine" (this user) | "shared" (defaults, admins only)
+
+
+def _clean_list(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    out, seen = [], set()
+    for k in items:
+        n = _normalize_kind(k)
+        if not n:
+            continue
+        base, i = n["id"], 2
+        while n["id"] in seen:
+            n["id"] = f"{base}{i}"; i += 1
+        seen.add(n["id"]); out.append(n)
+    return out
+
+
+@app.put("/api/lookups")
+async def api_lookups_put(body: LookupsBody, request: Request, session: dict = Depends(require_session)):
+    out = _clean_list(body.lookups)
+    if not out:
+        raise HTTPException(400, "Add at least one document type with a name and a root folder")
+    try:
+        if body.scope == "shared":
+            if not _is_admin(request, session):
+                raise HTTPException(403, "Only administrators listed in ADMIN_USERS can change the shared defaults")
+            _write_json(LOOKUPS_FILE, out)
+            _set_kinds(out)
+        else:
+            _write_json(_user_file(session["user"]), out)
+    except OSError as e:
+        raise HTTPException(500, f"Could not save document types: {e}")
+    return {"kinds": _effective_kinds(session), "hasCustom": bool(_load_user_kinds(session["user"]))}
+
+
+@app.delete("/api/lookups")
+async def api_lookups_reset(session: dict = Depends(require_session)):
+    """Drop this user's own list and go back to the shared defaults."""
+    try:
+        f = _user_file(session["user"])
+        if f.exists():
+            f.unlink()
+    except OSError as e:
+        raise HTTPException(500, f"Could not reset: {e}")
+    return {"kinds": KINDS, "hasCustom": False}
+
+
+@app.get("/api/subfolders/{folder_id}")
+async def api_subfolders(folder_id: int, session: dict = Depends(require_session)):
+    """Folder picker: immediate subfolders of an entry (1 = repository root)."""
+    try:
+        children = await lf().children(session["tok"], folder_id)
+    except LfError as e:
+        return _lf_error(e)
+    except httpx.HTTPError as e:
+        return JSONResponse({"error": f"Laserfiche is not reachable: {e}"}, status_code=502)
+    folders = [{"id": c["id"], "name": c["name"], "fullPath": c["fullPath"]} for c in children if c["isFolder"]]
+    folders.sort(key=lambda f: f["name"].lower())
+    return {"folders": folders}
 
 
 @app.get("/api/health")

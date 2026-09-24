@@ -12,7 +12,7 @@ Type an order number, get the Laserfiche order folder and its documents, open ei
   - *Windows client*: the app serves a `.lfe` shortcut (`GET api/lfe/<id>`) — folders as `<entry id='…' makeroot='n'/>`, documents as `mode='1'` (imaged, document viewer) or `mode='2'` (electronic, native application). The browser downloads it and the Laserfiche Windows client opens it. Each `.lfe` starts a new client window, as the client itself works.
   - Clicking a folder *row* (not its name) browses into it inside the app.
 - **Sign-in** — the app calls the API Server's `/Token` endpoint with the user's Laserfiche/LFDS/Windows credentials and keeps the returned bearer token in an encrypted, HttpOnly cookie for the token's lifetime. On expiry the app simply asks the user to sign in again. If the site is behind `oauth2-proxy`, the M365 email's local part is pre-filled as the user name.
-- **Expandable** — every entry in `LOOKUPS` becomes a tab. One entry = no tab bar, just the search box.
+- **Document types** — managed on the ⚙ **Settings** page inside the app (Name, Root folder with a repository browser, Match, Subfolders, Field name). There is a **shared default** list that everyone starts with, editable by the admins named in `ADMIN_USERS`, and every user can **customize their own** list on top (add, remove, reorder) with a *Reset to defaults* button. Lists are stored under `./data/` (a Docker volume), keyed by Laserfiche user name, so they follow the user to any PC. Each type becomes a tab; one type = no tab bar.
 
 ## Deploy (Docker, same pattern as the other tools)
 
@@ -40,9 +40,11 @@ Port **8097** is the next free one after `lfcapture` (8096); change it in `docke
 | `LF_REPOSITORY` | `NorthernFruit` | |
 | `LF_WEB_URL` | `https://lf.northernfruit.com/laserfiche` | Web client |
 | `LF_VERIFY_TLS` | `true` | Set `false` only for a certificate the container can't validate |
-| `LOOKUPS` | `orders\|Order\|\Sales\Orders\|prefix\|0` | `id\|Label\|\Root\|match\|subfolders`, `;`-separated — match `prefix` / `contains` / `field:Name`; subfolders `1`/`0` |
+| `ADMIN_USERS` | — | Laserfiche user names allowed to edit the shared defaults (comma-separated; `DOMAIN\` optional). Everyone can edit their own list. |
+| `LOOKUPS` | `orders\|Order\|\Sales\Orders\|prefix\|0` | Initial shared defaults, only used until an admin saves the shared list in the app. `id\|Label\|\Root\|match\|subfolders`, `;`-separated |
+| `DATA_DIR` | `/srv/data` | Where `lookups.json` (shared) and `users/<name>.json` (per user) live — mapped to `./data` by compose |
 
-For example `LOOKUPS=orders|Order|\Sales\Orders|prefix|0;ap|AP Invoice|\Accounts Payable|prefix|1;employees|Employee|\Active Employees|contains|1` gives three tabs: orders matched flat under `\Sales\Orders`, AP invoices found anywhere under `\Accounts Payable` (vendor\year\invoice — the sub-path shows in the list), and employees by name fragment. Restart the container after changing it. This is the same format the desktop utility stores, so the two lists can be copy-pasted between them.
+Once running, manage types on the ⚙ Settings page rather than in `.env`: admins see a **My types / Shared defaults** switch; everyone else edits only their own list. Match styles: `prefix` (folder named the text or `text*`), `contains` (`*text*`), `field` (template field equals the text — lists matching documents). **Sub** searches anywhere under the root (vendor\year\invoice; nested hits show their sub-path). The **…** button browses the repository for the root folder. The `LOOKUPS` format is the same one the desktop utility stores.
 
 ## Installing it as an app
 
@@ -73,7 +75,8 @@ To set it for everyone by policy (GPO/Intune), so nobody has to do the above:
 ## Files
 
 ```
-app/main.py         FastAPI app: session cookie, /api/config, /api/login, /api/logout, /api/lookup/{kind}, /api/folder/{id}, /api/lfe/{id}
+app/main.py         FastAPI app: session cookie, /api/config, /api/login, /api/logout, /api/lookup/{kind}, /api/folder/{id}, /api/lfe/{id}, /api/lookups (GET/PUT/DELETE), /api/subfolders/{id}
+data/               shared defaults (lookups.json) and per-user lists (users/<name>.json) — Docker volume, git-ignored
 app/lf.py           Repository API client (token, ByPath, folder children, SimpleSearches)
 static/             index.html, app.js, style.css, manifest.webmanifest, sw.js, icons/
 Dockerfile, docker-compose.yml, requirements.txt, .env.example, nginx-lfdocs.conf

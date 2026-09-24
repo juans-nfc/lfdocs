@@ -16,6 +16,7 @@
   <span id="title" class="title">LF Docs</span>
   <span class="grow"></span>
   <span id="who" class="who"></span>
+  <button id="settings-btn" class="link" title="Document types" hidden>⚙ Settings</button>
   <button id="signout" class="link" hidden>Sign out</button>
 </header>
 
@@ -59,7 +60,46 @@
 
     <ul id="results" class="results"></ul>
   </section>
+
+  <section id="settings" class="card" hidden>
+    <h2>Document types</h2>
+    <div class="scope" id="scope-row" hidden>
+      <div class="seg" role="radiogroup">
+        <button type="button" data-scope="mine" class="active">My types</button>
+        <button type="button" data-scope="shared">Shared defaults (everyone)</button>
+      </div>
+    </div>
+    <p class="muted" id="lk-help">Each row becomes a tab. <b>Match</b>: prefix = folder named the text or starting with it; contains = name contains the text; field = template field equals the text. <b>Sub</b> = search anywhere under the root.</p>
+    <div class="tablewrap">
+      <table id="lk-table" class="lk">
+        <thead><tr><th>Name</th><th>Root folder</th><th></th><th>Match</th><th>Sub</th><th>Field name</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="row">
+      <button type="button" id="lk-add">Add</button>
+      <button type="button" id="lk-reset" hidden>Reset to defaults</button>
+      <span class="grow"></span>
+      <span id="lk-msg" class="msg"></span>
+      <button type="button" id="lk-cancel">Cancel</button>
+      <button type="button" id="lk-save" class="primary">Save</button>
+    </div>
+  </section>
 </main>
+
+<div id="picker" class="modal" hidden>
+  <div class="modal-card">
+    <h3>Choose a folder</h3>
+    <div id="picker-tree" class="tree"></div>
+    <div class="row">
+      <span id="picker-path" class="pathlabel"></span>
+      <span class="grow"></span>
+      <button type="button" id="picker-cancel">Cancel</button>
+      <button type="button" id="picker-ok" class="primary" disabled>Select</button>
+    </div>
+  </div>
+</div>
+
 
 <script src="app.js"></script>
 </body>

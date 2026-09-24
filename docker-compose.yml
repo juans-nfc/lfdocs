@@ -6,3 +6,5 @@ services:
     env_file: .env
     ports:
       - "127.0.0.1:8097:8097"
+    volumes:
+      - ./data:/srv/data      # shared defaults + per-user document types

@@ -87,3 +87,28 @@ kbd { font: 11px/1 monospace; background: var(--hover); border: 1px solid var(--
 .seg button { border: none; border-radius: 0; padding: 4px 10px; font-size: 12px; background: var(--card); color: var(--muted); }
 .seg button + button { border-left: 1px solid var(--line); }
 .seg button.active { background: var(--accent); color: var(--accent-fg); font-weight: 600; }
+
+/* settings */
+.scope { margin: 6px 0 10px; }
+.tablewrap { overflow-x: auto; margin-bottom: 8px; }
+.lk { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 600px; }
+.lk th { text-align: left; color: var(--muted); font-weight: 600; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+.lk td { padding: 4px 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.lk input[type=text], .lk select { width: 100%; padding: 5px 8px; font-size: 13px; }
+.lk td.tight { width: 1%; white-space: nowrap; }
+.lk button.icon { padding: 4px 8px; }
+.lk .drag { color: var(--muted); cursor: default; }
+
+/* folder picker */
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 10; padding: 16px; }
+.modal-card { background: var(--card); color: var(--fg); border: 1px solid var(--line); border-radius: var(--radius); width: 100%; max-width: 520px; max-height: 90vh; display: flex; flex-direction: column; padding: 14px; }
+.modal-card h3 { margin: 0 0 8px; font-size: 15px; }
+.tree { flex: 1; overflow: auto; border: 1px solid var(--line); border-radius: 8px; padding: 6px; min-height: 240px; max-height: 60vh; font-size: 13px; }
+.tree ul { list-style: none; margin: 0; padding-left: 16px; }
+.tree > ul { padding-left: 0; }
+.tree li > .node { display: flex; align-items: center; gap: 4px; padding: 2px 4px; border-radius: 5px; cursor: pointer; white-space: nowrap; }
+.tree li > .node:hover { background: var(--hover); }
+.tree li > .node.selected { background: var(--accent); color: var(--accent-fg); }
+.tree .tw { width: 14px; text-align: center; color: var(--muted); font-size: 11px; flex: none; }
+.tree .node.selected .tw { color: inherit; }
+.pathlabel { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
