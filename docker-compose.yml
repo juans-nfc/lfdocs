@@ -1,0 +1,8 @@
+services:
+  lfdocs:
+    build: .
+    container_name: lfdocs
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "127.0.0.1:8097:8097"
