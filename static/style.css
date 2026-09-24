@@ -79,3 +79,10 @@ button.link { background: none; border: none; color: inherit; text-decoration: u
 .results .meta { font-size: 12px; color: var(--muted); white-space: nowrap; }
 @media (max-width: 480px) { .results .meta.wide { display: none; } }
 kbd { font: 11px/1 monospace; background: var(--hover); border: 1px solid var(--line); border-radius: 4px; padding: 2px 5px; }
+
+.openwith { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; }
+.muted-inline { color: var(--muted); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { border: none; border-radius: 0; padding: 4px 10px; font-size: 12px; background: var(--card); color: var(--muted); }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button.active { background: var(--accent); color: var(--accent-fg); font-weight: 600; }

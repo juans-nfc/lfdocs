@@ -2,12 +2,15 @@
 
 `https://tools.northernfruit.com/lfdocs/`
 
-Type an order number, get the Laserfiche order folder and its documents, open either in the **Laserfiche web client**. Installable as a Chrome/Edge app so it runs in its own small window. Each user signs in with their own Laserfiche account; the server never stores passwords.
+Type an order number, get the Laserfiche order folder and its documents, open either in the **Laserfiche web client** or, via a downloaded `.lfe` shortcut, in the **Laserfiche Windows client**. Installable as a Chrome/Edge app so it runs in its own small window. Each user signs in with their own Laserfiche account; the server never stores passwords.
 
 ## How it works
 
 - **Lookup** — exact `\Sales\Orders\<number>` first; if that folder doesn't exist, folder names under `\Sales\Orders` are matched as `<number>*` (so `80670` → `80670-0`). One match opens; several are listed. Wildcards can be typed (`8067*`, `80670-?`).
-- **Opening** — folders open `browse.aspx?db=<repo>#?id=…`, documents open `docview.aspx?db=<repo>&id=…`, both in a new tab of the normal browser. Clicking a folder row (not its name) browses into it inside the app.
+- **Opening** — an **Open with** toggle (remembered per browser) picks the client:
+  - *Web client*: folders open `browse.aspx?db=<repo>#?id=…`, documents `docview.aspx?db=<repo>&id=…`, in a new tab of the normal browser.
+  - *Windows client*: the app serves a `.lfe` shortcut (`GET api/lfe/<id>`) — folders as `<entry id='…' makeroot='n'/>`, documents as `mode='1'` (imaged, document viewer) or `mode='2'` (electronic, native application). The browser downloads it and the Laserfiche Windows client opens it. Each `.lfe` starts a new client window, as the client itself works.
+  - Clicking a folder *row* (not its name) browses into it inside the app.
 - **Sign-in** — the app calls the API Server's `/Token` endpoint with the user's Laserfiche/LFDS/Windows credentials and keeps the returned bearer token in an encrypted, HttpOnly cookie for the token's lifetime. On expiry the app simply asks the user to sign in again. If the site is behind `oauth2-proxy`, the M365 email's local part is pre-filled as the user name.
 - **Expandable** — every entry in `LOOKUPS` becomes a tab. One entry = no tab bar, just the search box.
 
@@ -56,10 +59,21 @@ To push it to everyone without clicks, use the browser policy (GPO or Intune) `W
 [{ "url": "https://tools.northernfruit.com/lfdocs/", "default_launch_container": "window", "create_desktop_shortcut": true }]
 ```
 
+## Making `.lfe` one click (Windows client option)
+
+The first time, Chrome/Edge show the downloaded `.lfe` in the download bubble; the user clicks it to open. To skip that click from then on: right-click the download → **Always open files of this type** (Chrome) / **Always open** (Edge). The file type is registered by the Laserfiche Windows client, so nothing else is needed on the PC.
+
+To set it for everyone by policy (GPO/Intune), so nobody has to do the above:
+
+- Chrome: `AutoOpenFileTypes` = `["lfe"]` and `AutoOpenAllowedForURLs` = `["https://tools.northernfruit.com"]`
+- Edge: `AutoOpenFileTypes` = `["lfe"]` and `AutoOpenAllowedForURLs` = `["https://tools.northernfruit.com"]`
+
+`.lfe` files are ignored by the app's service worker cache and require the signed-in session, like every other API call.
+
 ## Files
 
 ```
-app/main.py         FastAPI app: session cookie, /api/config, /api/login, /api/logout, /api/lookup/{kind}, /api/folder/{id}
+app/main.py         FastAPI app: session cookie, /api/config, /api/login, /api/logout, /api/lookup/{kind}, /api/folder/{id}, /api/lfe/{id}
 app/lf.py           Repository API client (token, ByPath, folder children, SimpleSearches)
 static/             index.html, app.js, style.css, manifest.webmanifest, sw.js, icons/
 Dockerfile, docker-compose.yml, requirements.txt, .env.example, nginx-lfdocs.conf

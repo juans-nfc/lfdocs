@@ -15,7 +15,7 @@ from urllib.parse import quote
 import httpx
 from cryptography.fernet import Fernet, InvalidToken
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response as RawResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -143,6 +143,8 @@ def _web_url(entry: dict[str, Any]) -> str:
 def _decorate(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for e in entries:
         e["webUrl"] = _web_url(e)
+        e["lfeUrl"] = (f"api/lfe/{e['id']}?name={quote(e['name'], safe='')}"
+                       + ("&folder=true" if e["isFolder"] else f"&pages={int(e.get('pageCount') or 0)}"))
     return entries
 
 
@@ -252,6 +254,32 @@ async def api_folder(folder_id: int, session: dict = Depends(require_session)):
     except httpx.HTTPError as e:
         return JSONResponse({"error": f"Laserfiche is not reachable: {e}"}, status_code=502)
     return {"children": _decorate(children)}
+
+
+# ---------------------------------------------------------------- .lfe shortcut for the Windows client
+
+def _xml_attr(v: str) -> str:
+    return v.replace("&", "&amp;").replace("'", "&apos;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+@app.get("/api/lfe/{entry_id}")
+async def api_lfe(entry_id: int, name: str = "", pages: int = 0, folder: bool = False, session: dict = Depends(require_session)):
+    """Laserfiche Windows client shortcut (.lfe). Folders open with the tree shown; documents open in the
+    document viewer (imaged pages) or the native application (electronic document without pages)."""
+    if folder:
+        entry = f"<entry id='{entry_id}' makeroot='n' />"
+    else:
+        entry = f"<entry id='{entry_id}' mode='{1 if pages > 0 else 2}' />"
+    xml = (
+        "<?xml version='1.0' encoding='utf-8'?>\r\n<laserfiche>\r\n"
+        f"  <repository name='{_xml_attr(LF.repository)}'>\r\n    {entry}\r\n  </repository>\r\n</laserfiche>\r\n"
+    )
+    safe = "".join(c for c in (name or f"entry-{entry_id}") if c.isalnum() or c in " -_.()")[:80].strip() or f"entry-{entry_id}"
+    return RawResponse(
+        content=xml.encode("utf-8"),
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": f'attachment; filename="{safe}.lfe"', "Cache-Control": "no-store"},
+    )
 
 
 @app.get("/api/health")

@@ -40,6 +40,13 @@
       <input id="q" name="q" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="e.g. 80670">
       <button type="submit" class="primary" id="find">Find</button>
     </form>
+    <div class="openwith">
+      <span class="muted-inline">Open with</span>
+      <div class="seg" role="radiogroup">
+        <button type="button" id="ow-web" data-ow="web">Web client</button>
+        <button type="button" id="ow-win" data-ow="win">Windows client</button>
+      </div>
+    </div>
     <div id="status" class="status" role="status"></div>
 
     <div id="folder" class="folderhead" hidden>
@@ -47,7 +54,7 @@
         <div class="foldername" id="folder-name"></div>
         <div class="folderpath" id="folder-path"></div>
       </div>
-      <a id="folder-open" class="primary btn" target="_blank" rel="noopener">Open folder in Laserfiche</a>
+      <a id="folder-open" class="primary btn" target="_blank" rel="noopener">Open folder</a>
     </div>
 
     <ul id="results" class="results"></ul>

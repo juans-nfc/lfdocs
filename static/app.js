@@ -11,6 +11,43 @@
 
   let cfg = null;
   let kind = null;
+  let openWith = localStorage.getItem("lfdocs.openWith") || "web";   // "web" | "win"
+  let currentFolder = null;
+
+  // ---------- open with ----------
+  const owBtns = () => Array.from(document.querySelectorAll(".seg button[data-ow]"));
+  function setOpenWith(v) {
+    openWith = v; localStorage.setItem("lfdocs.openWith", v);
+    owBtns().forEach((b) => b.classList.toggle("active", b.dataset.ow === v));
+    if (currentFolder) applyFolderButton(currentFolder);
+    el.results.querySelectorAll("li").forEach((li) => { if (li._entry) applyEntryLink(li, li._entry); });
+    if (v === "win" && !localStorage.getItem("lfdocs.lfeHintShown")) {
+      localStorage.setItem("lfdocs.lfeHintShown", "1");
+      status("Windows client: your browser downloads a small .lfe shortcut — choose \"Always open files of this type\" on it once and it becomes one click.", "warn");
+    }
+  }
+  function download(url) {
+    const a = document.createElement("a"); a.href = url; a.download = ""; a.style.display = "none";
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+  function openEntry(e) {
+    if (openWith === "win") download(e.lfeUrl); else window.open(e.webUrl, "_blank", "noopener");
+  }
+  function applyFolderButton(folder) {
+    if (openWith === "win") {
+      el.folderOpen.textContent = "Open folder in Windows client";
+      el.folderOpen.href = folder.lfeUrl; el.folderOpen.removeAttribute("target"); el.folderOpen.setAttribute("download", "");
+    } else {
+      el.folderOpen.textContent = "Open folder in web client";
+      el.folderOpen.href = folder.webUrl; el.folderOpen.target = "_blank"; el.folderOpen.removeAttribute("download");
+    }
+  }
+  function applyEntryLink(li, e) {
+    const a = li.querySelector("a");
+    if (openWith === "win") { a.href = e.lfeUrl; a.removeAttribute("target"); a.setAttribute("download", ""); }
+    else { a.href = e.webUrl; a.target = "_blank"; a.removeAttribute("download"); }
+    a.title = (e.isFolder ? "Open this folder" : "Open this document") + (openWith === "win" ? " in the Windows client" : " in the web client");
+  }
 
   // ---------- helpers ----------
   const api = async (path, opts = {}) => {
@@ -51,13 +88,14 @@
     el.qLabel.textContent = k.label + " #"; el.q.placeholder = "e.g. 80670";
     renderKinds(); clearResults(); status("");
   }
-  function clearResults() { el.results.innerHTML = ""; el.folder.hidden = true; }
+  function clearResults() { el.results.innerHTML = ""; el.folder.hidden = true; currentFolder = null; }
 
   function showFolder(folder) {
+    currentFolder = folder;
     el.folder.hidden = false;
     el.folderName.textContent = folder.name;
     el.folderPath.textContent = folder.fullPath || "";
-    el.folderOpen.href = folder.webUrl;
+    applyFolderButton(folder);
   }
 
   function renderEntries(entries, onFolder) {
@@ -67,21 +105,22 @@
       const li = document.createElement("li"); li.className = e.isFolder ? "folder" : "doc"; li.tabIndex = 0;
       const ico = document.createElement("span"); ico.className = "ico"; ico.textContent = e.isFolder ? "📁" : "📄";
       const name = document.createElement("span"); name.className = "name";
-      const a = document.createElement("a"); a.textContent = e.name; a.href = e.webUrl; a.target = "_blank"; a.rel = "noopener";
-      a.title = e.isFolder ? "Open this folder in Laserfiche" : "Open in the Laserfiche document viewer";
+      const a = document.createElement("a"); a.textContent = e.name; a.rel = "noopener";
       name.appendChild(a);
+      li._entry = e;
       const meta = document.createElement("span"); meta.className = "meta";
       meta.textContent = e.isFolder ? "Folder" : [e.extension ? e.extension.toUpperCase() : e.entryType, e.pageCount ? e.pageCount + " p" : ""].filter(Boolean).join(" · ");
       const meta2 = document.createElement("span"); meta2.className = "meta wide"; meta2.textContent = fmtDate(e.modified);
       li.append(ico, name, meta, meta2);
+      applyEntryLink(li, e);
       if (e.isFolder) {
         // click the row = browse into it here; click the name = open in Laserfiche
         li.onclick = (ev) => { if (ev.target !== a) onFolder(e); };
         li.onkeydown = (ev) => { if (ev.key === "Enter") onFolder(e); };
         a.onclick = (ev) => ev.stopPropagation();
       } else {
-        li.onclick = (ev) => { if (ev.target !== a) window.open(e.webUrl, "_blank", "noopener"); };
-        li.onkeydown = (ev) => { if (ev.key === "Enter") window.open(e.webUrl, "_blank", "noopener"); };
+        li.onclick = (ev) => { if (ev.target !== a) openEntry(e); };
+        li.onkeydown = (ev) => { if (ev.key === "Enter") openEntry(e); };
       }
       el.results.appendChild(li);
     }
@@ -146,6 +185,8 @@
     el.loginRepo.textContent = "Repository: " + cfg.repository;
     const savedKind = localStorage.getItem("lfdocs.kind");
     setKind(cfg.kinds.find((k) => k.id === savedKind) || cfg.kinds[0]);
+    owBtns().forEach((b) => (b.onclick = () => setOpenWith(b.dataset.ow)));
+    owBtns().forEach((b) => b.classList.toggle("active", b.dataset.ow === openWith));
     if (cfg.signedIn) showSearch(cfg.username); else showLogin();
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js", { scope: "./" }).catch(() => {});
   })();
