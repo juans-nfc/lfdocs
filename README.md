@@ -40,9 +40,9 @@ Port **8097** is the next free one after `lfcapture` (8096); change it in `docke
 | `LF_REPOSITORY` | `NorthernFruit` | |
 | `LF_WEB_URL` | `https://lf.northernfruit.com/laserfiche` | Web client |
 | `LF_VERIFY_TLS` | `true` | Set `false` only for a certificate the container can't validate |
-| `LOOKUPS` | `orders\|Order\|\Sales\Orders` | `id\|Label\|\Root\Path`, `;`-separated |
+| `LOOKUPS` | `orders\|Order\|\Sales\Orders\|prefix\|0` | `id\|Label\|\Root\|match\|subfolders`, `;`-separated — match `prefix` / `contains` / `field:Name`; subfolders `1`/`0` |
 
-To add invoices later, for example: `LOOKUPS=orders|Order|\Sales\Orders;invoices|Invoice|\AP\Invoices` and restart the container — an "Invoices" tab appears.
+For example `LOOKUPS=orders|Order|\Sales\Orders|prefix|0;ap|AP Invoice|\Accounts Payable|prefix|1;employees|Employee|\Active Employees|contains|1` gives three tabs: orders matched flat under `\Sales\Orders`, AP invoices found anywhere under `\Accounts Payable` (vendor\year\invoice — the sub-path shows in the list), and employees by name fragment. Restart the container after changing it. This is the same format the desktop utility stores, so the two lists can be copy-pasted between them.
 
 ## Installing it as an app
 

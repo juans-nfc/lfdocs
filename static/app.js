@@ -105,7 +105,7 @@
       const li = document.createElement("li"); li.className = e.isFolder ? "folder" : "doc"; li.tabIndex = 0;
       const ico = document.createElement("span"); ico.className = "ico"; ico.textContent = e.isFolder ? "📁" : "📄";
       const name = document.createElement("span"); name.className = "name";
-      const a = document.createElement("a"); a.textContent = e.name; a.rel = "noopener";
+      const a = document.createElement("a"); a.textContent = (e.subPath ? e.subPath + "\\" : "") + e.name; a.rel = "noopener";
       name.appendChild(a);
       li._entry = e;
       const meta = document.createElement("span"); meta.className = "meta";
@@ -147,7 +147,7 @@
       if (!r.found) { status(r.message, "err"); return; }
       if (r.multiple) {
         renderEntries(r.matches, openFolderHere);
-        status(r.matches.length + " folders match " + r.pattern + " — pick one", "warn");
+        status(r.matches.length + " results match " + r.pattern + " — pick one", "warn");
         return;
       }
       showFolder(r.folder);

@@ -35,20 +35,35 @@ COOKIE_NAME = "lfdocs_session"
 VERIFY_TLS = os.getenv("LF_VERIFY_TLS", "true").lower() not in ("0", "false", "no")
 
 
-def _load_kinds() -> list[dict[str, str]]:
-    """LOOKUPS="orders|Order|\\Sales\\Orders;invoices|Invoice|\\AP\\Invoices" -> tabs in the UI."""
-    raw = os.getenv("LOOKUPS", r"orders|Order|\Sales\Orders")
+def _load_kinds() -> list[dict[str, Any]]:
+    """LOOKUPS="id|Label|\\Root|match|subfolders;..." -> tabs in the UI.
+
+    match: prefix (default) | contains | field:<Field name>; subfolders: 1/0 (default: 1 for contains, else 0).
+    Same format as the desktop utility's settings.
+    """
+    raw = os.getenv("LOOKUPS", r"orders|Order|\Sales\Orders|prefix|0")
     kinds = []
     for part in raw.split(";"):
         part = part.strip()
         if not part:
             continue
         bits = [b.strip() for b in part.split("|")]
-        if len(bits) != 3:
-            raise RuntimeError(f"Bad LOOKUPS entry: {part!r} (expected id|Label|\\Root\\Path)")
-        kid, label, root = bits
-        root = "\\" + root.strip("\\")
-        kinds.append({"id": kid, "label": label, "root": root})
+        if len(bits) < 3:
+            raise RuntimeError(f"Bad LOOKUPS entry: {part!r} (expected id|Label|\\Root\\Path[|match[|subfolders]])")
+        kid, label, root = bits[0], bits[1], "\\" + bits[2].strip("\\")
+        match = (bits[3] if len(bits) > 3 and bits[3] else "prefix")
+        is_field = match.lower().startswith("field:")
+        is_contains = match.lower() == "contains"
+        if len(bits) > 4 and bits[4]:
+            sub = bits[4].lower() in ("1", "true", "yes", "sub", "subfolders")
+        else:
+            sub = is_contains
+        kinds.append({
+            "id": kid, "label": label, "root": root,
+            "match": "field" if is_field else "contains" if is_contains else "prefix",
+            "field": match[6:].strip() if is_field else "",
+            "subfolders": sub,
+        })
     if not kinds:
         raise RuntimeError("LOOKUPS is empty")
     return kinds
@@ -216,11 +231,20 @@ async def api_lookup(kind: str, q: str, session: dict = Depends(require_session)
     root = k["root"]
     exact = not WILDCARDS.search(q)
     try:
+        if k["match"] == "field":
+            hits = await lf().find_by_field(token, root, k["field"], q)
+            if not hits:
+                return {"found": False, "message": f"Nothing under {root} has {k['field']} = {q}"}
+            if len(hits) == 1 and hits[0]["isFolder"]:
+                children = await lf().children(token, hits[0]["id"])
+                return {"found": True, "folder": _decorate(hits)[0], "matchedFrom": q, "children": _decorate(children)}
+            return {"found": True, "multiple": True, "pattern": f"{k['field']} = {q}", "root": root, "matches": _decorate(hits)}
+
         folder = await lf().find_by_path(token, f"{root}\\{q}") if exact else None
         matched_from = None
         if folder is None:
-            pattern = q + "*" if exact else q
-            matches = await lf().find_folders_by_name(token, root, pattern)
+            pattern = q if not exact else (f"*{q}*" if k["match"] == "contains" else f"{q}*")
+            matches = await lf().find_folders_by_name(token, root, pattern, subfolders=k["subfolders"])
             if not matches:
                 return {"found": False, "message": f"No {k['label'].lower()} folder matching {pattern} in {root}", "pattern": pattern}
             if len(matches) > 1:

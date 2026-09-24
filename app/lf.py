@@ -147,23 +147,39 @@ class LfClient:
         j = resp.json()
         return [_entry(i) for i in (j.get("value") or []) if isinstance(i, dict)]
 
-    async def find_folders_by_name(self, token: str, root_path: str, pattern: str) -> list[dict[str, Any]]:
+    async def find_folders_by_name(self, token: str, root_path: str, pattern: str, subfolders: bool = False) -> list[dict[str, Any]]:
         root = root_path.rstrip("\\")
         esc = lambda v: v.replace('"', '""')
-        cmd = f'{{LF:Name="{esc(pattern)}", Type=F}} & {{LF:LOOKIN="{esc(root)}", Subfolders=0}}'
+        scope = "" if subfolders else ", Subfolders=0"
+        cmd = f'{{LF:Name="{esc(pattern)}", Type=F}} & {{LF:LOOKIN="{esc(root)}"{scope}}}'
         hits = await self.simple_search(token, cmd)
         out = []
         for h in hits:
             if not h["isFolder"]:
                 continue
             fp = (h.get("folderPath") or "").rstrip("\\")
-            if fp and fp.lower() != root.lower():
+            if not subfolders and fp and fp.lower() != root.lower():
                 continue
             if not h["fullPath"]:
-                h["fullPath"] = f"{root}\\{h['name']}"
+                h["fullPath"] = f"{fp or root}\\{h['name']}"
+            # where the hit lives, relative to the root (empty for direct children)
+            h["subPath"] = fp[len(root) + 1:] if fp.lower().startswith(root.lower() + "\\") else ""
             out.append(h)
-        out.sort(key=lambda e: e["name"].lower())
+        out.sort(key=lambda e: (e["subPath"].lower(), e["name"].lower()))
         return out
+
+    async def find_by_field(self, token: str, root_path: str, field: str, value: str) -> list[dict[str, Any]]:
+        root = root_path.rstrip("\\")
+        esc = lambda v: v.replace('"', '""')
+        cmd = f'{{[]:[{field.replace("]", "]]")}]="{esc(value)}"}} & {{LF:LOOKIN="{esc(root)}"}}'
+        hits = await self.simple_search(token, cmd)
+        for h in hits:
+            fp = (h.get("folderPath") or "").rstrip("\\")
+            if not h["fullPath"] and fp:
+                h["fullPath"] = f"{fp}\\{h['name']}"
+            h["subPath"] = fp[len(root) + 1:] if fp.lower().startswith(root.lower() + "\\") else ""
+        hits.sort(key=lambda e: (e["subPath"].lower(), e["name"].lower()))
+        return hits
 
 
 BAD_CHARS = re.compile(r'[\\/:"<>|]')
