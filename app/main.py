@@ -42,7 +42,7 @@ def _load_kinds() -> list[dict[str, Any]]:
     match: prefix (default) | contains | field:<Field name>; subfolders: 1/0 (default: 1 for contains, else 0).
     Same format as the desktop utility's settings.
     """
-    raw = os.getenv("LOOKUPS", r"orders|Order|\Sales\Orders|prefix|0")
+    raw = os.getenv("LOOKUPS", r"orders|Order|\Sales\Orders|prefix|0;ap|AP Invoice|\Accounts Payable|prefix|1;employees|Employee|\Active Employees|contains|1")
     kinds = []
     for part in raw.split(";"):
         part = part.strip()

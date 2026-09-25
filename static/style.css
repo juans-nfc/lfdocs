@@ -94,8 +94,10 @@ kbd { font: 11px/1 monospace; background: var(--hover); border: 1px solid var(--
 .lk { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 600px; }
 .lk th { text-align: left; color: var(--muted); font-weight: 600; padding: 4px 6px; border-bottom: 1px solid var(--line); }
 .lk td { padding: 4px 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }
-.lk input[type=text], .lk select { width: 100%; padding: 5px 8px; font-size: 13px; }
+.lk input[type=text] { width: 100%; padding: 5px 8px; font-size: 13px; }
+.lk select { min-width: 104px; padding: 5px 6px; font-size: 13px; font: inherit; color: var(--fg); background: var(--card); border: 1px solid var(--line); border-radius: 8px; }
 .lk td.tight { width: 1%; white-space: nowrap; }
+.lk td.field input:disabled { opacity: .5; }
 .lk button.icon { padding: 4px 8px; }
 .lk .drag { color: var(--muted); cursor: default; }
 

@@ -197,13 +197,16 @@
       td("tight").appendChild(browse);
       const match = document.createElement("select");
       for (const m of ["prefix", "contains", "field"]) { const o = document.createElement("option"); o.value = m; o.textContent = m; match.appendChild(o); }
-      match.value = k.match || "prefix"; match.onchange = () => { k.match = match.value; field.disabled = k.match !== "field"; };
+      match.value = k.match || "prefix";
+      match.onchange = () => { k.match = match.value; field.disabled = k.match !== "field"; field.placeholder = k.match === "field" ? "Employee ID" : ""; };
       td("tight").appendChild(match);
       const sub = document.createElement("input"); sub.type = "checkbox"; sub.checked = !!k.subfolders; sub.onchange = () => (k.subfolders = sub.checked);
       td("tight").appendChild(sub);
-      const field = document.createElement("input"); field.type = "text"; field.value = k.field || ""; field.placeholder = "Employee ID"; field.disabled = (k.match || "prefix") !== "field";
-      field.oninput = () => (k.field = field.value);
-      td().appendChild(field);
+      const field = document.createElement("input"); field.type = "text"; field.value = k.field || "";
+      field.placeholder = (k.match || "prefix") === "field" ? "Employee ID" : "";
+      field.disabled = (k.match || "prefix") !== "field";
+      field.oninput = () => { k.field = field.value; if (field.value.trim() && k.match !== "field") { k.match = "field"; match.value = "field"; } };
+      td("field").appendChild(field);
       const ops = td("tight");
       const up = document.createElement("button"); up.type = "button"; up.className = "icon"; up.textContent = "▲"; up.disabled = i === 0; up.onclick = () => { [lkDraft[i - 1], lkDraft[i]] = [lkDraft[i], lkDraft[i - 1]]; renderDraft(); };
       const dn = document.createElement("button"); dn.type = "button"; dn.className = "icon"; dn.textContent = "▼"; dn.disabled = i === lkDraft.length - 1; dn.onclick = () => { [lkDraft[i + 1], lkDraft[i]] = [lkDraft[i], lkDraft[i + 1]]; renderDraft(); };
