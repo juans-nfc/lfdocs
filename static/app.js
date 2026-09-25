@@ -81,7 +81,7 @@
     el.kinds.innerHTML = "";
     el.kinds.hidden = cfg.kinds.length < 2;
     for (const k of cfg.kinds) {
-      const b = document.createElement("button"); b.type = "button"; b.textContent = k.label + "s";
+      const b = document.createElement("button"); b.type = "button"; b.textContent = k.label;
       b.className = k.id === kind.id ? "active" : ""; b.onclick = () => { setKind(k); el.q.focus(); };
       el.kinds.appendChild(b);
     }
